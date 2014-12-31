@@ -80,13 +80,8 @@ final class ConnectionServiceWrapper extends ServiceBinder<IConnectionService> {
     private static final int MSG_SET_CALLER_DISPLAY_NAME = 18;
     private static final int MSG_SET_VIDEO_STATE = 19;
     private static final int MSG_SET_CONFERENCEABLE_CONNECTIONS = 20;
-    private static final int MSG_SET_EXTRAS = 21;
-    private static final int MSG_SET_DISCONNECTED_WITH_SUPP_NOTIFICATION = 22;
-    private static final int MSG_SET_PHONE_ACCOUNT = 23;
-    private static final int MSG_SET_CALL_SUBSTATE = 24;
-    private static final int MSG_ADD_EXISTING_CONNECTION = 25;
-
-    private static final int MSG_SET_CALL_PROPERTIES = 30;
+    private static final int MSG_SET_PHONE_ACCOUNT = 21;
+    private static final int MSG_SET_CALL_PROPERTIES = 22;
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -113,20 +108,6 @@ final class ConnectionServiceWrapper extends ServiceBinder<IConnectionService> {
                         //Log.w(this, "setActive, unknown call id: %s", msg.obj);
                     }
                     break;
-                case MSG_SET_EXTRAS: {
-                    SomeArgs args = (SomeArgs) msg.obj;
-                    try {
-                        String callId = (String) args.arg1;
-                        Bundle extras = (Bundle) args.arg2;
-                        call = mCallIdMapper.getCall(callId);
-                        if (call != null) {
-                            mCallsManager.setCallExtras(call, extras);
-                        }
-                    } finally {
-                        args.recycle();
-                    }
-                    break;
-                }
                 case MSG_SET_RINGING:
                     call = mCallIdMapper.getCall(msg.obj);
                     if (call != null) {
@@ -230,6 +211,20 @@ final class ConnectionServiceWrapper extends ServiceBinder<IConnectionService> {
                         ParcelableConference parcelableConference =
                                 (ParcelableConference) args.arg2;
 
+                        // Make sure that there's at least one valid call. For remote connections
+                        // we'll get a add conference msg from both the remote connection service
+                        // and from the real connection service.
+                        boolean hasValidCalls = false;
+                        for (String callId : parcelableConference.getConnectionIds()) {
+                            if (mCallIdMapper.getCall(callId) != null) {
+                                hasValidCalls = true;
+                            }
+                        }
+                        if (!hasValidCalls) {
+                            Log.d(this, "Attempting to add a conference with no valid calls");
+                            break;
+                        }
+
                         // need to create a new Call
                         Call conferenceCall = mCallsManager.createConferenceCall(
                                 null, parcelableConference);
@@ -241,10 +236,6 @@ final class ConnectionServiceWrapper extends ServiceBinder<IConnectionService> {
                         for (String callId : parcelableConference.getConnectionIds()) {
                             Call childCall = mCallIdMapper.getCall(callId);
                             Log.d(this, "found child: %s", callId);
-                            if (conferenceCall.getTargetPhoneAccount() == null) {
-                                PhoneAccountHandle ph = childCall.getTargetPhoneAccount();
-                                conferenceCall.setTargetPhoneAccount(ph);
-                            }
                             if (childCall != null) {
                                 childCall.setParentCall(conferenceCall);
                             }
@@ -386,26 +377,6 @@ final class ConnectionServiceWrapper extends ServiceBinder<IConnectionService> {
                     }
                     break;
                 }
-                case MSG_SET_CALL_SUBSTATE: {
-                    call = mCallIdMapper.getCall(msg.obj);
-                    if (call != null) {
-                        call.setCallSubstate(msg.arg1);
-                    }
-                    break;
-                }
-                case MSG_ADD_EXISTING_CONNECTION: {
-                    SomeArgs args = (SomeArgs) msg.obj;
-                    try {
-                        String callId = (String)args.arg1;
-                        ParcelableConnection connection = (ParcelableConnection)args.arg2;
-                        Call existingCall = mCallsManager.createCallForExistingConnection(callId,
-                                connection);
-                        mCallIdMapper.addCall(existingCall, callId);
-                        existingCall.setConnectionService(ConnectionServiceWrapper.this);
-                    } finally {
-                        args.recycle();
-                    }
-                }
             }
         }
     };
@@ -434,15 +405,6 @@ final class ConnectionServiceWrapper extends ServiceBinder<IConnectionService> {
             if (mCallIdMapper.isValidCallId(callId) || mCallIdMapper.isValidConferenceId(callId)) {
                 mHandler.obtainMessage(MSG_SET_ACTIVE, callId).sendToTarget();
             }
-        }
-
-        @Override
-        public void setExtras(String callId, Bundle extras) {
-            logIncoming("setExtras size= " + extras.size() + " | callId= " + callId);
-            SomeArgs args = SomeArgs.obtain();
-            args.arg1 = callId;
-            args.arg2 = extras;
-            mHandler.obtainMessage(MSG_SET_EXTRAS, args).sendToTarget();
         }
 
         @Override
@@ -534,10 +496,12 @@ final class ConnectionServiceWrapper extends ServiceBinder<IConnectionService> {
         @Override
         public void setIsConferenced(String callId, String conferenceCallId) {
             logIncoming("setIsConferenced %s %s", callId, conferenceCallId);
-            SomeArgs args = SomeArgs.obtain();
-            args.arg1 = callId;
-            args.arg2 = conferenceCallId;
-            mHandler.obtainMessage(MSG_SET_IS_CONFERENCED, args).sendToTarget();
+            if (mCallIdMapper.isValidCallId(callId)) {
+                SomeArgs args = SomeArgs.obtain();
+                args.arg1 = callId;
+                args.arg2 = conferenceCallId;
+                mHandler.obtainMessage(MSG_SET_IS_CONFERENCED, args).sendToTarget();
+            }
         }
 
         @Override
@@ -642,24 +606,6 @@ final class ConnectionServiceWrapper extends ServiceBinder<IConnectionService> {
                 args.arg2 = pHandle;
                 mHandler.obtainMessage(MSG_SET_PHONE_ACCOUNT, args).sendToTarget();
             }
-        }
-
-        @Override
-        public void setCallSubstate(String callId, int callSubstate) {
-            logIncoming("setCallSubstate %s %d", callId, callSubstate);
-            if (mCallIdMapper.isValidCallId(callId)) {
-                mHandler.obtainMessage(
-                    MSG_SET_CALL_SUBSTATE, callSubstate, 0, callId).sendToTarget();
-            }
-        }
-
-        @Override
-        public void addExistingConnection(String callId, ParcelableConnection connection) {
-            logIncoming("addExistingConnection  %s %s", callId, connection);
-            SomeArgs args = SomeArgs.obtain();
-            args.arg1 = callId;
-            args.arg2 = connection;
-            mHandler.obtainMessage(MSG_ADD_EXISTING_CONNECTION, args).sendToTarget();
         }
     }
 

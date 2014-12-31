@@ -18,7 +18,6 @@ package com.android.server.telecom;
 
 // TODO: Needed for move to system service: import com.android.internal.R;
 import com.android.internal.os.SomeArgs;
-import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.SmsApplication;
 
 import android.content.ComponentName;
@@ -30,11 +29,9 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Message;
 import android.telecom.Response;
-import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.widget.Toast;
 
-import java.lang.NumberFormatException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -142,18 +139,10 @@ public class RespondViaSmsManager extends CallsManagerListenerBase {
 
     @Override
     public void onIncomingCallRejected(Call call, boolean rejectWithMessage, String textMessage) {
-        if (call != null && rejectWithMessage) {
-            long subId = SubscriptionManager.getDefaultSubId();
-            if (call.getTargetPhoneAccount() != null) {
-                try {
-                    subId = Long.parseLong(call.getTargetPhoneAccount().getId());
-                } catch (NumberFormatException e) {
-                    Log.e(RespondViaSmsManager.this, e , "Exception e ");
-                }
-            }
+        if (rejectWithMessage) {
 
             rejectCallWithMessage(call.getContext(), call.getHandle().getSchemeSpecificPart(),
-                    textMessage, subId);
+                    textMessage);
         }
     }
 
@@ -186,8 +175,7 @@ public class RespondViaSmsManager extends CallsManagerListenerBase {
     /**
      * Reject the call with the specified message. If message is null this call is ignored.
      */
-    private void rejectCallWithMessage(Context context, String phoneNumber, String textMessage,
-            long subId) {
+    private void rejectCallWithMessage(Context context, String phoneNumber, String textMessage) {
         if (textMessage != null) {
             final ComponentName component =
                     SmsApplication.getDefaultRespondViaMessageApplication(context,
@@ -197,7 +185,6 @@ public class RespondViaSmsManager extends CallsManagerListenerBase {
                 final Uri uri = Uri.fromParts(Constants.SCHEME_SMSTO, phoneNumber, null);
                 final Intent intent = new Intent(TelephonyManager.ACTION_RESPOND_VIA_MESSAGE, uri);
                 intent.putExtra(Intent.EXTRA_TEXT, textMessage);
-                intent.putExtra(PhoneConstants.SUBSCRIPTION_KEY, subId);
 
                 SomeArgs args = SomeArgs.obtain();
                 args.arg1 = phoneNumber;
