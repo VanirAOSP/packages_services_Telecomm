@@ -118,13 +118,12 @@ public class MissedCallNotifierImpl extends CallsManagerListenerBase implements 
     private final Context mContext;
     private final NotificationManager mNotificationManager;
 
-    private final ComponentName mNotificationComponent;
-
     private ExecutorService mCallInfoExecutor;
     private CallInfoProvider mCallInfoProvider;
     private boolean mNetworkConnected;
     private final List<MissedCallInfo> mMissedCalls =
             Collections.synchronizedList(new ArrayList<MissedCallInfo>());
+    private final ComponentName mNotificationComponent;
 
     public MissedCallNotifierImpl(Context context, CallInfoProvider callInfoProvider) {
         mContext = context;
@@ -132,6 +131,11 @@ public class MissedCallNotifierImpl extends CallsManagerListenerBase implements 
                 (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
         mCallInfoProvider = callInfoProvider;
         registerForNetwork();
+
+        final String notificationComponent = context.getString(R.string.notification_component);
+
+        mNotificationComponent = notificationComponent != null
+                ? ComponentName.unflattenFromString(notificationComponent) : null;
     }
 
 
@@ -291,12 +295,7 @@ public class MissedCallNotifierImpl extends CallsManagerListenerBase implements 
         return false;
     }
 
-
     private void showMissedCallNotificationInternal(MissedCallInfo call) {
-        if (sendNotificationCustomComponent(call, mMissedCallCount)) {
-            return;
-        }
-
         // Create a public viewable version of the notification, suitable for display when sensitive
         // notification content is hidden.
         Notification.Builder publicBuilder = new Notification.Builder(mContext);
@@ -323,6 +322,40 @@ public class MissedCallNotifierImpl extends CallsManagerListenerBase implements 
                 // notification is shown on the user's lock screen and they have chosen to hide
                 // sensitive notification information.
                 .setPublicVersion(publicBuilder.build());
+
+        // display the first line of the notification:
+       // 1 missed call: call name
+        // more than 1 missed call: <number of calls> + "missed calls" (+ list of calls)
+        if (mMissedCalls.size() == 1) {
+            builder.setContentTitle(mContext.getText(R.string.notification_missedCallTitle));
+            builder.setContentText(call.getName());
+            builder.setSubText(call.getSummaryText());
+            publicBuilder.setContentText(mContext.getText(R.string.notification_missedCallTitle));
+
+        } else {
+            String message = mContext.getString(R.string.notification_missedCallsMsg,
+                    mMissedCalls.size());
+
+            builder.setContentTitle(mContext.getText(R.string.notification_missedCallsTitle));
+            builder.setContentText(message);
+            publicBuilder.setContentText(mContext.getText(R.string.notification_missedCallsTitle));
+
+            Notification.InboxStyle style = new Notification.InboxStyle(builder);
+            String number = call.getNumber();
+
+            for (MissedCallInfo info : mMissedCalls) {
+                style.addLine(formatSingleCallLine(info.getName(), info.getCreationTimeMillis()));
+
+                // only keep number if equal for all calls in order to hide actions
+                // if the calls came from different numbers
+                if (!TextUtils.equals(number, info.getNumber())) {
+                    number = null;
+                }
+            }
+            style.setBigContentTitle(message);
+            style.setSummaryText(" ");
+            builder.setStyle(style);
+        }
 
         Uri handleUri = call.getHandle();
         String handle = handleUri == null ? null : handleUri.getSchemeSpecificPart();
@@ -382,8 +415,7 @@ public class MissedCallNotifierImpl extends CallsManagerListenerBase implements 
         // Reset the list of missed calls
         mMissedCalls.clear();
 
-
-        if (sendNotificationCustomComponent(null, mMissedCallCount)) {
+        if (sendNotificationCustomComponent(null, mMissedCalls.size())) {
             return;
         }
 
