@@ -253,7 +253,7 @@ public class MissedCallNotifierImpl extends CallsManagerListenerBase implements 
         cancelMissedCallNotification();
     }
 
-    private void showMissedCallNotificationInternal(MissedCallInfo call) {
+    /**
      * Broadcasts missed call notification to custom component if set.
      * @param number The phone number associated with the notification. null if
      *               no call.
@@ -291,7 +291,8 @@ public class MissedCallNotifierImpl extends CallsManagerListenerBase implements 
         return false;
     }
 
-    /**
+
+    private void showMissedCallNotificationInternal(MissedCallInfo call) {
         if (sendNotificationCustomComponent(call, mMissedCallCount)) {
             return;
         }
@@ -322,40 +323,6 @@ public class MissedCallNotifierImpl extends CallsManagerListenerBase implements 
                 // notification is shown on the user's lock screen and they have chosen to hide
                 // sensitive notification information.
                 .setPublicVersion(publicBuilder.build());
-
-        // display the first line of the notification:
-       // 1 missed call: call name
-        // more than 1 missed call: <number of calls> + "missed calls" (+ list of calls)
-        if (mMissedCalls.size() == 1) {
-            builder.setContentTitle(mContext.getText(R.string.notification_missedCallTitle));
-            builder.setContentText(call.getName());
-            builder.setSubText(call.getSummaryText());
-            publicBuilder.setContentText(mContext.getText(R.string.notification_missedCallTitle));
-
-        } else {
-            String message = mContext.getString(R.string.notification_missedCallsMsg,
-                    mMissedCalls.size());
-
-            builder.setContentTitle(mContext.getText(R.string.notification_missedCallsTitle));
-            builder.setContentText(message);
-            publicBuilder.setContentText(mContext.getText(R.string.notification_missedCallsTitle));
-
-            Notification.InboxStyle style = new Notification.InboxStyle(builder);
-            String number = call.getNumber();
-
-            for (MissedCallInfo info : mMissedCalls) {
-                style.addLine(formatSingleCallLine(info.getName(), info.getCreationTimeMillis()));
-
-                // only keep number if equal for all calls in order to hide actions
-                // if the calls came from different numbers
-                if (!TextUtils.equals(number, info.getNumber())) {
-                    number = null;
-                }
-            }
-            style.setBigContentTitle(message);
-            style.setSummaryText(" ");
-            builder.setStyle(style);
-        }
 
         Uri handleUri = call.getHandle();
         String handle = handleUri == null ? null : handleUri.getSchemeSpecificPart();
