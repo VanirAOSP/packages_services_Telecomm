@@ -29,6 +29,7 @@ import android.os.Trace;
 import android.provider.CallLog.Calls;
 import android.provider.Settings;
 import android.telecom.CallAudioState;
+import android.provider.Settings;
 import android.telecom.Conference;
 import android.telecom.Connection;
 import android.telecom.DisconnectCause;
@@ -175,7 +176,6 @@ public class CallsManager extends Call.ListenerBase implements VideoProviderProx
     private String mLchSub = null;
 
     private InCallTonePlayer mLocalCallReminderTonePlayer = null;
-    private InCallTonePlayer mSupervisoryCallHoldTonePlayer = null;
     private String mSubInConversation = null;
 
     private Runnable mStopTone;
@@ -1423,6 +1423,16 @@ public class CallsManager extends Call.ListenerBase implements VideoProviderProx
         return count;
     }
 
+    int getNumTopLevelCalls() {
+        int count = 0;
+        for (Call call : mCalls) {
+            if (call.getParentCall() == null) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     Call getOutgoingCall() {
         return getFirstCallWithState(OUTGOING_CALL_STATES);
     }
@@ -1700,7 +1710,7 @@ public class CallsManager extends Call.ListenerBase implements VideoProviderProx
                 }
 
                 // If only call in call list is held call it's also a foreground call
-                if (mCalls.size() == 1 && call.getState() == CallState.ON_HOLD) {
+                if (getNumTopLevelCalls() == 1 && call.getState() == CallState.ON_HOLD) {
                     newForegroundCall = call;
                 }
 
@@ -1733,7 +1743,7 @@ public class CallsManager extends Call.ListenerBase implements VideoProviderProx
                 }
 
                 // If only call in call list is held call it's also a foreground call
-                if (mCalls.size() == 1 && call.getState() == CallState.ON_HOLD) {
+                if (getNumTopLevelCalls() == 1 && call.getState() == CallState.ON_HOLD) {
                     newForegroundCall = call;
                 }
 
@@ -2340,17 +2350,7 @@ public class CallsManager extends Call.ListenerBase implements VideoProviderProx
                     mPlayerFactory.createPlayer(InCallTonePlayer.TONE_HOLD_RECALL);
             mLocalCallReminderTonePlayer.start();
         }
-        if (sSupervisoryCallHoldToneConfig.equals("inband")) {
-            // if "persist.radio.sch_tone" is set to "inband", play inband supervisory
-            // call hold tone. if set to "dtmf", play the SCH tones
-            // over DTMF, don't play SCH tones for anyother value.
-            if (mSupervisoryCallHoldTonePlayer == null) {
-                Log.d(this, " startDsdaInCallTones: Supervisory call hold tone ");
-                mSupervisoryCallHoldTonePlayer =
-                        mPlayerFactory.createPlayer(InCallTonePlayer.TONE_SUPERVISORY_CH);
-                mSupervisoryCallHoldTonePlayer.start();
-            }
-        } else if (sSupervisoryCallHoldToneConfig.equals("dtmf")) {
+        if (sSupervisoryCallHoldToneConfig.equals("dtmf")) {
             Log.d(this, " startDsdaInCallTones: Supervisory call hold tone over dtmf ");
             playLchDtmf();
         }
@@ -2366,11 +2366,6 @@ public class CallsManager extends Call.ListenerBase implements VideoProviderProx
             Log.d(this, " stopMSimInCallTones: local call hold reminder tone ");
             mLocalCallReminderTonePlayer.stopTone();
             mLocalCallReminderTonePlayer = null;
-        }
-        if (mSupervisoryCallHoldTonePlayer != null) {
-            Log.d(this, " stopMSimInCallTones: Supervisory call hold tone ");
-            mSupervisoryCallHoldTonePlayer.stopTone();
-            mSupervisoryCallHoldTonePlayer = null;
         }
         if (sSupervisoryCallHoldToneConfig.equals("dtmf")) {
             Log.d(this, " stopMSimInCallTones: stop SCH Dtmf call hold tone ");
