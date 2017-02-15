@@ -885,6 +885,12 @@ public class CallsManager extends Call.ListenerBase
                     false /* forceAttachToExistingConnection */,
                     false /* isConference */
             );
+            if ((extras != null) &&
+                    extras.getBoolean(TelephonyProperties.EXTRA_DIAL_CONFERENCE_URI, false)) {
+                //Reset PostDialDigits with empty string for ConfURI call.
+                call.setPostDialDigits("");
+            }
+
             call.initAnalytics();
 
             call.setInitiatingUser(initiatingUser);
@@ -1155,7 +1161,7 @@ public class CallsManager extends Call.ListenerBase
             if (activeCall != null && activeCall != call &&
                     (activeCall.isActive() ||
                      activeCall.getState() == CallState.DIALING ||
-                     activeCall.getState() == CallState.PULLING)) {
+                     activeCall.getState() == CallState.PULLING )) {
                 if (0 == (activeCall.getConnectionCapabilities()
                         & Connection.CAPABILITY_HOLD)) {
                     // This call does not support hold.  If it is from a different connection
@@ -1374,12 +1380,12 @@ public class CallsManager extends Call.ListenerBase
 
         handleCallTechnologyChange(c);
         handleChildAddressChange(c);
-        updateCanAddCall();
 
         if (extras != null) {
             boolean isNeedReset = extras.getBoolean("isNeedReset", false);
             handleCdmaConnectionTimeReset(c, isNeedReset);
         }
+        updateCanAddCall();
     }
 
     void handleCdmaConnectionTimeReset(Call call, boolean isNeedReset) {
@@ -1393,6 +1399,7 @@ public class CallsManager extends Call.ListenerBase
             call.removeExtras(Call.SOURCE_INCALL_SERVICE,
                     new ArrayList<String>(Arrays.asList("isNeedReset")));
         }
+        updateCanAddCall();
     }
 
     // Construct the list of possible PhoneAccounts that the outgoing call can use based on the
@@ -1525,6 +1532,15 @@ public class CallsManager extends Call.ListenerBase
             updateLchStatus(account.getId());
             call.setTargetPhoneAccount(account);
 
+            // Set video state after selection of phone account.
+            Bundle extras = call.getIntentExtras();
+            if (extras != null) {
+                int videoState = extras.getInt(TelecomManager.EXTRA_START_CALL_WITH_VIDEO_STATE,
+                        VideoProfile.STATE_AUDIO_ONLY);
+                Log.d(this, "phoneAccountSelected , setVideoState : " + videoState);
+                call.setVideoState(videoState);
+            }
+
             if (!call.isNewOutgoingCallIntentBroadcastDone()) {
                 return;
             }
@@ -1631,25 +1647,23 @@ public class CallsManager extends Call.ListenerBase
      * Removes an existing disconnected call, and notifies the in-call app.
      */
     void markCallAsRemoved(Call call) {
-        boolean isHoldInConference = call.isHoldInConference();
-        Log.v(this, "markCallAsRemoved: isHoldInConference = "
-                + isHoldInConference + "call -> %s", call);
-
         removeCall(call);
         if (!hasAnyCalls()) {
             updateLchStatus(null);
             setActiveSubscription(null);
             manageDsdaInCallTones(false);
         }
-
         Call foregroundCall = mCallAudioManager.getPossiblyHeldForegroundCall();
+        boolean isChildCall = call.isChildCall();
         if (mLocallyDisconnectingCalls.contains(call)) {
+            Log.v(this, "markCallAsRemoved: isChildCall = "
+                + isChildCall + "call -> %s", call);
             mLocallyDisconnectingCalls.remove(call);
-            if (!isHoldInConference && foregroundCall != null
+            if (!isChildCall && foregroundCall != null
                     && foregroundCall.getState() == CallState.ON_HOLD) {
                 foregroundCall.unhold();
             }
-        } else if (foregroundCall != null &&
+        } else if (!isChildCall && foregroundCall != null &&
                 !foregroundCall.can(Connection.CAPABILITY_SUPPORT_HOLD)  &&
                 foregroundCall.getState() == CallState.ON_HOLD) {
 

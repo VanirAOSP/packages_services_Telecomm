@@ -209,7 +209,7 @@ public class Call implements CreateConnectionResponse {
     /**
      * The post-dial digits that were dialed after the network portion of the number
      */
-    private final String mPostDialDigits;
+    private String mPostDialDigits;
 
     /**
      * The secondary line number that an incoming call has been received on if the SIM subscription
@@ -273,7 +273,7 @@ public class Call implements CreateConnectionResponse {
 
     private boolean mSpeakerphoneOn;
 
-    private boolean mIsHoldInConference = false;
+    private boolean mIsChildCall = false;
 
     /**
      * Tracks the video states which were applicable over the duration of a call.
@@ -654,14 +654,6 @@ public class Call implements CreateConnectionResponse {
             mState = newState;
             maybeLoadCannedSmsResponses();
 
-            if (mState == CallState.ON_HOLD && getParentCall() != null) {
-                Log.v(this, "setState is conference hold, %s", mState);
-                mIsHoldInConference = true;
-            } else if (mState != CallState.DISCONNECTED) {
-                Log.v(this, "setState is not conference hold, %s", mState);
-                mIsHoldInConference = false;
-            }
-
             if (mState == CallState.ACTIVE || mState == CallState.ON_HOLD) {
                 if (mConnectTimeMillis == 0) {
                     // We check to see if mConnectTime is already set to prevent the
@@ -754,6 +746,10 @@ public class Call implements CreateConnectionResponse {
 
     public Uri getHandle() {
         return mHandle;
+    }
+
+    public void setPostDialDigits(String postDialDigits) {
+        mPostDialDigits = postDialDigits;
     }
 
     public String getPostDialDigits() {
@@ -1103,8 +1099,17 @@ public class Call implements CreateConnectionResponse {
         return mWasConferencePreviouslyMerged;
     }
 
-    boolean isHoldInConference() {
-        return mIsHoldInConference;
+    public boolean isChildCall() {
+        return mIsChildCall;
+    }
+
+    /**
+     * Sets whether this call is a child call.
+     */
+    private void maybeSetCallAsChild() {
+        if (mParentCall != null) {
+            mIsChildCall = true;
+        }
     }
 
     @VisibleForTesting
@@ -1329,6 +1334,7 @@ public class Call implements CreateConnectionResponse {
 
         // Track that the call is now locally disconnecting.
         setLocallyDisconnecting(true);
+        maybeSetCallAsChild();
 
         if (mState == CallState.NEW || mState == CallState.SELECT_PHONE_ACCOUNT ||
                 mState == CallState.CONNECTING) {
@@ -1446,9 +1452,6 @@ public class Call implements CreateConnectionResponse {
                         "hold call failed due to null CS callId=%s", getId());
             }
             Log.event(this, Log.Events.REQUEST_HOLD);
-            if (getParentCall() != null) {
-                mIsHoldInConference = true;
-            }
         }
     }
 
@@ -1464,7 +1467,6 @@ public class Call implements CreateConnectionResponse {
                         "unhold call failed due to null CS callId=%s", getId());
             }
             Log.event(this, Log.Events.REQUEST_UNHOLD);
-            mIsHoldInConference = false;
         }
     }
 

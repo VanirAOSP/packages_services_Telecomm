@@ -42,7 +42,7 @@ public class DirectToVoicemailCallFilter implements IncomingCallFilter.CallFilte
                     @Override
                     public void onCallerInfoQueryComplete(Uri handle, CallerInfo info) {
                         CallFilteringResult result;
-                        if ((handle != null) && Objects.equals(callHandle, handle)) {
+                        if (Objects.equals(callHandle, handle)) {
                             if (info != null && info.shouldSendToVoicemail) {
                                 result = new CallFilteringResult(
                                         false, // shouldAllowCall

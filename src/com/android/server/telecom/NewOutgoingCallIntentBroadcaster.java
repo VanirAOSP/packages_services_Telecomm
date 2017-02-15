@@ -117,8 +117,8 @@ public class NewOutgoingCallIntentBroadcaster {
                     if (resultNumber == null) {
                         Log.v(this, "Call cancelled (null number), returning...");
                         endEarly = true;
-                    } else if (mPhoneNumberUtilsAdapter.isPotentialLocalEmergencyNumber(
-                            mContext, resultNumber)) {
+                    } else if (TelephonyUtil.isPotentialLocalEmergencyNumber(
+                            mPhoneNumberUtilsAdapter, mContext, resultNumber)) {
                         Log.w(this, "Cannot modify outgoing call to emergency number %s.",
                                 resultNumber);
                         endEarly = true;
@@ -138,12 +138,20 @@ public class NewOutgoingCallIntentBroadcaster {
                         return;
                     }
 
-                    Uri resultHandleUri = Uri.fromParts(
-                            mPhoneNumberUtilsAdapter.isUriNumber(resultNumber) ?
-                                    PhoneAccount.SCHEME_SIP : PhoneAccount.SCHEME_TEL,
-                            resultNumber, null);
-
+                    boolean isSkipSchemaParsing = mIntent.getBooleanExtra(
+                            TelephonyProperties.EXTRA_SKIP_SCHEMA_PARSING, false);
+                    Uri resultHandleUri = null;
                     Uri originalUri = mIntent.getData();
+                    if (isSkipSchemaParsing) {
+                        // resultNumber does not have the schema present
+                        // hence use originalUri which is same as handle
+                        resultHandleUri = Uri.fromParts(PhoneAccount.SCHEME_TEL,
+                                originalUri.toString(), null);
+                    } else {
+                        resultHandleUri = Uri.fromParts(mPhoneNumberUtilsAdapter
+                                .isUriNumber(resultNumber) ? PhoneAccount.SCHEME_SIP
+                                : PhoneAccount.SCHEME_TEL, resultNumber, null);
+                    }
 
                     if (originalUri.getSchemeSpecificPart().equals(resultNumber)) {
                         Log.v(this, "Call number unmodified after" +

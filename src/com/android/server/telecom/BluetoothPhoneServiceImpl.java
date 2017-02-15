@@ -329,13 +329,13 @@ public class BluetoothPhoneServiceImpl {
         @Override
         public void onCallAdded(Call call) {
             Log.d(TAG, "onCallAdded");
+            if (call.isExternalCall()) {
+                return;
+            }
             if (isDsdaEnabled() && call.isConference() &&
                     (call.getChildCalls().size() == 0)) {
                 Log.d(TAG, "Ignore onCallAdded for new parent call" +
                         " update headset when onIsConferencedChanged is called later");
-                return;
-            }
-            if (call.isExternalCall()) {
                 return;
             }
             updateHeadsetWithCallState(false /* force */, call);
@@ -371,6 +371,9 @@ public class BluetoothPhoneServiceImpl {
         public void onCallStateChanged(Call call, int oldState, int newState) {
             Log.d(TAG, "onCallStateChanged, call: " + call + " oldState: " + oldState +
                     " newState: " + newState);
+            if (call.isExternalCall()) {
+                return;
+            }
             // If onCallStateChanged comes with oldState = newState when DSDA is enabled,
             // check if the call is on ActiveSub. If so, this callback is called for
             // Active Subscription change.
@@ -384,9 +387,6 @@ public class BluetoothPhoneServiceImpl {
                             " state change for BG sub. Ignore updating HS");
                     return;
                 }
-            }
-            if (call.isExternalCall()) {
-                return;
             }
             // If a call is being put on hold because of a new connecting call, ignore the
             // CONNECTING since the BT state update needs to send out the numHeld = 1 + dialing
@@ -625,6 +625,12 @@ public class BluetoothPhoneServiceImpl {
                 return false;
             if (activeCall != null) {
                 mCallsManager.disconnectCall(activeCall);
+                if (ringingCall != null) {
+                    mCallsManager.answerCall(ringingCall, VideoProfile.STATE_AUDIO_ONLY);
+                } else if (heldCall != null) {
+                    mCallsManager.unholdCall(heldCall);
+                }
+                return true;
             }
             if (ringingCall != null) {
                 mCallsManager.answerCall(ringingCall, ringingCall.getVideoState());

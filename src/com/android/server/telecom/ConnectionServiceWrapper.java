@@ -343,11 +343,6 @@ public class ConnectionServiceWrapper extends ServiceBinder {
                     // deliver the message anyway that they want. b/20530631.
                     Call call = mCallIdMapper.getCall(callId);
                     if (call != null) {
-                        // Update extras so that event reaches to InCallUi and InCallUi
-                        // updates merge button.
-                        Bundle extras = new Bundle();
-                        extras.putBoolean("update", true);
-                        call.putExtras(Call.SOURCE_CONNECTION_SERVICE, extras);
                         call.onConnectionEvent(Connection.EVENT_CALL_MERGE_FAILED, null);
                     } else {
                         Log.w(this, "setConferenceMergeFailed, unknown call id: %s", callId);
@@ -1031,12 +1026,12 @@ public class ConnectionServiceWrapper extends ServiceBinder {
     }
 
     void removeCall(String callId, DisconnectCause disconnectCause) {
+        mCallIdMapper.removeCall(callId);
+
         CreateConnectionResponse response = mPendingResponses.remove(callId);
         if (response != null) {
             response.handleCreateConnectionFailure(disconnectCause);
         }
-
-        mCallIdMapper.removeCall(callId);
     }
 
     void removeCall(Call call, DisconnectCause disconnectCause) {
