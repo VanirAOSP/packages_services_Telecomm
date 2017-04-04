@@ -477,36 +477,6 @@ public class CallsManager extends Call.ListenerBase
     }
 
     /**
-     * Whether allow (silence rather than reject) the incoming call if it has a different source
-     * (connection service) from the existing ringing call when reaching maximum ringing calls.
-     */
-    private boolean shouldSilenceInsteadOfReject(Call incomingCall) {
-        if (!mContext.getResources().getBoolean(
-                R.bool.silence_incoming_when_different_service_and_maximum_ringing)) {
-            return false;
-        }
-
-        Call ringingCall = null;
-
-        for (Call call : mCalls) {
-            // Only operate on top-level calls
-            if (call.getParentCall() != null) {
-                continue;
-            }
-
-            if (call.isExternalCall()) {
-                continue;
-            }
-
-            if (CallState.RINGING == call.getState() &&
-                    call.getConnectionService() == incomingCall.getConnectionService()) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-    /**
      * Determines if the incoming video call is allowed or not
      *
      * @param Call The incoming call.
@@ -536,6 +506,36 @@ public class CallsManager extends Call.ListenerBase
         return (state == CallState.RINGING);
     }
 
+    /**
+     * Whether allow (silence rather than reject) the incoming call if it has a different source
+     * (connection service) from the existing ringing call when reaching maximum ringing calls.
+     */
+    private boolean shouldSilenceInsteadOfReject(Call incomingCall) {
+        if (!mContext.getResources().getBoolean(
+                R.bool.silence_incoming_when_different_service_and_maximum_ringing)) {
+            return false;
+        }
+
+        Call ringingCall = null;
+
+        for (Call call : mCalls) {
+            // Only operate on top-level calls
+            if (call.getParentCall() != null) {
+                continue;
+            }
+
+            if (call.isExternalCall()) {
+                continue;
+            }
+
+            if (CallState.RINGING == call.getState() &&
+                    call.getConnectionService() == incomingCall.getConnectionService()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     @Override
     public void onFailedIncomingCall(Call call) {
