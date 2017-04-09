@@ -22,8 +22,8 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
         android-support-v4 \
         guava \
         mockito-target \
-        platform-test-annotations \
         ims-ext-common \
+        platform-test-annotations \
         org.cyanogenmod.platform.internal
 
 LOCAL_SRC_FILES := \
